@@ -1,4 +1,4 @@
-package wxdgaming.logbus;
+package wxdgaming.logbus.thread;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;

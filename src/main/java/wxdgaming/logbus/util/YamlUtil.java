@@ -1,9 +1,9 @@
-package wxdgaming.logbus;
+package wxdgaming.logbus.util;
 
-import com.alibaba.fastjson.JSONObject;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.representer.Representer;
+import wxdgaming.logbus.BootConfig;
 
 import java.io.File;
 import java.io.FileInputStream;

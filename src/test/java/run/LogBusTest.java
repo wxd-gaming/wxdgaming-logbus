@@ -3,7 +3,11 @@ package run;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
-import wxdgaming.logbus.*;
+import wxdgaming.logbus.HexId;
+import wxdgaming.logbus.LogBus;
+import wxdgaming.logbus.LogMain;
+import wxdgaming.logbus.util.RandomUtils;
+import wxdgaming.logbus.util.StringUtils;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -32,7 +36,7 @@ public class LogBusTest {
         for (int j = 0; j < random; j++) {
             JSONObject record = new JSONObject();
             record.fluentPut("createTime", System.currentTimeMillis());
-            record.fluentPut("account", j + "-" + LogBus.randomString(6));
+            record.fluentPut("account", j + "-" + StringUtils.randomString(6));
             record.fluentPut("uid", hexId.newId());
             recordMap.add(record);
         }
@@ -113,6 +117,7 @@ public class LogBusTest {
 
             LogBus.getInstance().pushRoleLv(account, uid, 2);
 
+            pushRecharge(account, uid);
             /*3星通关副本*/
             LogBus.getInstance().pushRoleLog(
                     "role_copy_success",

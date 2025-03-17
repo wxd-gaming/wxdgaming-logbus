@@ -18,17 +18,17 @@ public class LogBusDevTest extends LogBusTest {
 
     public static void main(String[] args) {
         LogBusDevTest logBusDevTest = new LogBusDevTest("log-boot-dev.yml");
-        logBusDevTest.test();
-        for (int i = 0; i < 1000; i++) {
-            for (int j = 0; j < 1000; j++) {
-                logBusDevTest.pushItem();
-            }
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
+        // logBusDevTest.test();
+        // for (int i = 0; i < 1000; i++) {
+        //     for (int j = 0; j < 1000; j++) {
+        //         logBusDevTest.pushItem();
+        //     }
+        //     try {
+        //         Thread.sleep(1000);
+        //     } catch (InterruptedException e) {
+        //         throw new RuntimeException(e);
+        //     }
+        // }
     }
 
 }

@@ -6,8 +6,7 @@ portUrl: http://127.0.0.1:19000
 batch: true
 batchSize: 100
 
-executorCoreSize: 2                        #默认线程池的核心线程数
-executorMaxSize: 4                         #默认线程池的最大线程数
+executorCoreSize: 4                        #默认线程池的核心线程数
 
 httpClient:
   core: 20                            #连接池的核心连接数

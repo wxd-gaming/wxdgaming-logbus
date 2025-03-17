@@ -9,7 +9,7 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
-import wxdgaming.logbus.GzipUtil;
+import wxdgaming.logbus.util.GzipUtil;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

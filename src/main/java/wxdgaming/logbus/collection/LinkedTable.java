@@ -1,4 +1,4 @@
-package wxdgaming.logbus;
+package wxdgaming.logbus.collection;
 
 import lombok.Getter;
 import lombok.Setter;

@@ -1,4 +1,4 @@
-package wxdgaming.logbus;
+package wxdgaming.logbus.util;
 
 import java.util.Collection;
 import java.util.Iterator;

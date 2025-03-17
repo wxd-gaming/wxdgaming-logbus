@@ -1,5 +1,7 @@
 package wxdgaming.logbus;
 
+import wxdgaming.logbus.util.AssertUtil;
+
 import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDate;

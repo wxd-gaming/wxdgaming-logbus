@@ -3,6 +3,7 @@ package wxdgaming.logbus;
 import lombok.Getter;
 import lombok.Setter;
 import wxdgaming.logbus.http.HttpClientConfig;
+import wxdgaming.logbus.util.YamlUtil;
 
 /**
  * 启动配置
@@ -29,7 +30,6 @@ public class BootConfig {
     private int batchSize = 100;
 
     private int executorCoreSize;
-    private int executorMaxSize;
 
     private HttpClientConfig httpClient;
 
