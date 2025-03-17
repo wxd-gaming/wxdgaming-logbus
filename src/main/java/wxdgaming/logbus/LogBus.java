@@ -1,27 +1,20 @@
 package wxdgaming.logbus;
 
 import com.alibaba.fastjson.JSONObject;
-import com.google.inject.Singleton;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import wxdgaming.boot2.core.BootConfig;
-import wxdgaming.boot2.core.ann.Start;
-import wxdgaming.boot2.core.ann.Value;
-import wxdgaming.boot2.core.chatset.StringUtils;
-import wxdgaming.boot2.core.collection.LinkedTable;
-import wxdgaming.boot2.core.collection.MapOf;
-import wxdgaming.boot2.core.collection.SplitCollection;
-import wxdgaming.boot2.core.format.HexId;
-import wxdgaming.boot2.core.io.FileWriteUtil;
-import wxdgaming.boot2.core.threading.ExecutorUtil;
-import wxdgaming.boot2.core.timer.MyClock;
-import wxdgaming.boot2.starter.net.httpclient.HttpBuilder;
-import wxdgaming.boot2.starter.net.httpclient.PostText;
-import wxdgaming.boot2.starter.net.httpclient.Response;
+import wxdgaming.logbus.http.HttpClientPool;
+import wxdgaming.logbus.http.PostJson;
+import wxdgaming.logbus.http.Response;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -32,18 +25,25 @@ import java.util.concurrent.TimeUnit;
  **/
 @Slf4j
 @Getter
-@Singleton
 public class LogBus {
 
-    private LogBusConfig config;
-    private LinkedTable<String, String, SplitCollection<JSONObject>> logMap = new LinkedTable<>();
-    private HexId hexId;
+    @Getter private static final LogBus instance = new LogBus();
 
-    @Start
-    public void init(@Value(path = "logbus") LogBusConfig config) {
-        this.config = config;
-        this.hexId = new HexId(this.config.getAppId());
-        ExecutorUtil.getInstance().getLogicExecutor().scheduleAtFixedDelay(
+    private LinkedTable<String, String, SplitCollection<JSONObject>> logMap = new LinkedTable<>();
+    private ScheduledExecutorService scheduledExecutorService;
+    private VirtualThreadExecutors virtualThreadExecutors;
+    private HexId hexId;
+    private SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd/HH");
+
+    public void init() {
+        this.hexId = new HexId(BootConfig.getIns().getSid());
+        this.scheduledExecutorService = Executors.newScheduledThreadPool(1);
+        this.virtualThreadExecutors = new VirtualThreadExecutors(
+                "logbus",
+                BootConfig.getIns().getExecutorCoreSize(),
+                BootConfig.getIns().getExecutorMaxSize()
+        );
+        scheduledExecutorService.scheduleWithFixedDelay(
                 () -> {
                     LinkedTable<String, String, SplitCollection<JSONObject>> tmpMap;
                     synchronized (this) {
@@ -54,19 +54,19 @@ public class LogBus {
                     for (Map.Entry<String, LinkedHashMap<String, SplitCollection<JSONObject>>> mapEntry : tmpMap.entrySet()) {
                         String queueKey = mapEntry.getKey();
                         for (Map.Entry<String, SplitCollection<JSONObject>> entry : mapEntry.getValue().entrySet()) {
-                            ExecutorUtil.getInstance().getVirtualExecutor().submit(
-                                    queueKey,
-                                    () -> {
-                                        SplitCollection<JSONObject> value = entry.getValue();
-                                        while (!value.isEmpty()) {
-                                            List<JSONObject> jsonObjects = value.removeFirst();
-                                            JSONObject postData = MapOf.newJSONObject();
-                                            postData.put("gameId", config.getAppId());
-                                            postData.put("token", config.getLogToken());
+                            SplitCollection<JSONObject> value = entry.getValue();
+                            while (!value.isEmpty()) {
+                                List<JSONObject> jsonObjects = value.removeFirst();
+                                this.virtualThreadExecutors.execute(
+                                        () -> {
+                                            JSONObject postData = new JSONObject();
+                                            postData.put("gameId", BootConfig.getIns().getAppId());
+                                            postData.put("token", BootConfig.getIns().getLogToken());
                                             postData.put("data", jsonObjects);
-                                            String uriPath = config.getPortUrl() + "/" + entry.getKey();
+                                            String uriPath = BootConfig.getIns().getPortUrl() + "/" + entry.getKey();
                                             try {
-                                                Response<PostText> request = HttpBuilder.postJson(uriPath, postData.toJSONString())
+                                                Response<PostJson> request = new PostJson(HttpClientPool.getDefault(), uriPath)
+                                                        .setParams(postData.toJSONString())
                                                         .readTimeout(130000)
                                                         .retry(2)
                                                         .request();
@@ -74,13 +74,19 @@ public class LogBus {
                                                     log.info("logbus push {} fail", entry.getKey());
                                                 }
                                             } catch (Exception e) {
-                                                String errorPath = "target/post/" + MyClock.formatDate("yyyy/MM/DD/HH") + "/error-" + System.nanoTime() + StringUtils.randomString(4) + ".log";
+                                                String errorPath = "target/post/" + sdf.format(new Date()) + "/error-" + System.nanoTime() + "-" + StringUtils.randomString(4) + ".log";
                                                 log.error("logbus push {} fail error log file {}", uriPath, errorPath, e);
-                                                FileWriteUtil.writeString(errorPath, "%s\n%s".formatted(uriPath, postData.toString()));
+                                                try {
+                                                    Path path = Path.of(errorPath);
+                                                    Files.createDirectories(path.getParent());
+                                                    Files.writeString(path, "%s\n%s".formatted(uriPath, postData.toString()));
+                                                } catch (IOException ex) {
+                                                    ex.printStackTrace(System.err);
+                                                }
                                             }
                                         }
-                                    }
-                            );
+                                );
+                            }
                         }
                     }
                 },
@@ -91,14 +97,15 @@ public class LogBus {
     }
 
     public void addRoleLogType(String logType, String logComment) {
-        JSONObject postData = MapOf.newJSONObject();
-        postData.put("gameId", config.getAppId());
-        postData.put("token", config.getAppToken());
+        JSONObject postData = new JSONObject();
+        postData.put("gameId", BootConfig.getIns().getAppId());
+        postData.put("token", BootConfig.getIns().getAppToken());
         postData.put("logType", logType);
         postData.put("logComment", logComment);
-        String uriPath = config.getPortUrl() + "/game/addRoleLogType";
+        String uriPath = BootConfig.getIns().getPortUrl() + "/game/addRoleLogType";
         try {
-            Response<PostText> request = HttpBuilder.postJson(uriPath, postData.toJSONString())
+            Response<PostJson> request = new PostJson(HttpClientPool.getDefault(), uriPath)
+                    .setParams(postData.toJSONString())
                     .readTimeout(130000)
                     .retry(2)
                     .request();
@@ -109,14 +116,15 @@ public class LogBus {
     }
 
     public void addServerLogType(String logType, String logComment) {
-        JSONObject postData = MapOf.newJSONObject();
-        postData.put("gameId", config.getAppId());
-        postData.put("token", config.getAppToken());
+        JSONObject postData = new JSONObject();
+        postData.put("gameId", BootConfig.getIns().getAppId());
+        postData.put("token", BootConfig.getIns().getAppToken());
         postData.put("logType", logType);
         postData.put("logComment", logComment);
-        String uriPath = config.getPortUrl() + "/game/addServerLogType";
+        String uriPath = BootConfig.getIns().getPortUrl() + "/game/addServerLogType";
         try {
-            Response<PostText> request = HttpBuilder.postJson(uriPath, postData.toJSONString())
+            Response<PostJson> request = new PostJson(HttpClientPool.getDefault(), uriPath)
+                    .setParams(postData.toJSONString())
                     .readTimeout(130000)
                     .retry(2)
                     .request();
@@ -170,11 +178,11 @@ public class LogBus {
     }
 
     public void pushLogin(String account, long roleId, String roleName, int lv, JSONObject other) {
-        JSONObject jsonObject = MapOf.newJSONObject()
+        JSONObject jsonObject = new JSONObject()
                 .fluentPut("logEnum", "LOGIN")
                 .fluentPut("uid", hexId.newId())/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
                 .fluentPut("createTime", System.currentTimeMillis())
-                .fluentPut("sid", BootConfig.getIns().sid())
+                .fluentPut("sid", BootConfig.getIns().getSid())
                 .fluentPut("account", account)
                 .fluentPut("roleId", roleId)
                 .fluentPut("roleName", roleName)
@@ -185,7 +193,7 @@ public class LogBus {
 
     /** 同步在线状态 建议每分钟一次 */
     public void online(String account, long roleId) {
-        JSONObject jsonObject = MapOf.newJSONObject()
+        JSONObject jsonObject = new JSONObject()
                 .fluentPut("account", account)
                 .fluentPut("roleId", roleId)
                 .fluentPut("time", System.currentTimeMillis());
@@ -193,11 +201,11 @@ public class LogBus {
     }
 
     public void pushLogout(String account, long roleId, String roleName, int lv, JSONObject other) {
-        JSONObject jsonObject = MapOf.newJSONObject()
+        JSONObject jsonObject = new JSONObject()
                 .fluentPut("logEnum", "LOGOUT")
                 .fluentPut("uid", hexId.newId())/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
                 .fluentPut("createTime", System.currentTimeMillis())
-                .fluentPut("sid", BootConfig.getIns().sid())
+                .fluentPut("sid", BootConfig.getIns().getSid())
                 .fluentPut("account", account)
                 .fluentPut("roleId", roleId)
                 .fluentPut("roleName", roleName)
@@ -209,10 +217,10 @@ public class LogBus {
     public void pushRecharge(String account, long roleId, String roleName, int lv,
                              String channel, long amount, String spOrder, String cpOrder,
                              JSONObject other) {
-        JSONObject jsonObject = MapOf.newJSONObject()
+        JSONObject jsonObject = new JSONObject()
                 .fluentPut("uid", hexId.newId())/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
                 .fluentPut("createTime", System.currentTimeMillis())
-                .fluentPut("sid", BootConfig.getIns().sid())
+                .fluentPut("sid", BootConfig.getIns().getSid())
                 .fluentPut("account", account)
                 .fluentPut("roleId", roleId)
                 .fluentPut("roleName", roleName)
@@ -238,11 +246,11 @@ public class LogBus {
      * @version: 2025-03-13 09:03
      */
     public void pushRoleLog(String logType, String account, long roleId, String roleName, int lv, JSONObject other) {
-        JSONObject jsonObject = MapOf.newJSONObject()
+        JSONObject jsonObject = new JSONObject()
                 .fluentPut("logType", logType)
                 .fluentPut("uid", hexId.newId())/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
                 .fluentPut("createTime", System.currentTimeMillis())
-                .fluentPut("sid", BootConfig.getIns().sid())
+                .fluentPut("sid", BootConfig.getIns().getSid())
                 .fluentPut("account", account)
                 .fluentPut("roleId", roleId)
                 .fluentPut("roleName", roleName)
@@ -275,10 +283,10 @@ public class LogBus {
                              String itemType, String itemSubType,
                              String source, String comment,
                              JSONObject other) {
-        JSONObject jsonObject = MapOf.newJSONObject()
+        JSONObject jsonObject = new JSONObject()
                 .fluentPut("uid", hexId.newId())/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
                 .fluentPut("createTime", System.currentTimeMillis())
-                .fluentPut("sid", BootConfig.getIns().sid())
+                .fluentPut("sid", BootConfig.getIns().getSid())
                 .fluentPut("account", account)
                 .fluentPut("roleId", roleId)
                 .fluentPut("roleName", roleName)
@@ -302,15 +310,45 @@ public class LogBus {
         synchronized (this) {
             key = String.valueOf(key.hashCode() % 20);
             key = "";
-            SplitCollection<JSONObject> collection = logMap.computeIfAbsent(key, url, k -> new SplitCollection<>(config.getBatchSize()));
+            SplitCollection<JSONObject> collection = logMap.computeIfAbsent(key, url, k -> new SplitCollection<>(BootConfig.getIns().getBatchSize()));
             collection.add(data);
         }
     }
 
     public enum ChangeTypeEnum {
         /** 获取 */
-        Get,
+        GET,
         /** 消耗 */
         COST
+    }
+
+    public static String randomString(int length) {
+        // 产生随机数
+        StringBuilder sb = new StringBuilder();
+        // 循环length次
+        for (int i = 0; i < length; i++) {
+            // 产生0-2个随机数，既与a-z，A-Z，0-9三种可能
+            int number = ThreadLocalRandom.current().nextInt(3);
+            long result = 0;
+            switch (number) {
+                // 如果number产生的是数字0；
+                case 0:
+                    // 产生A-Z的ASCII码
+                    result = Math.round(Math.random() * 25 + 65);
+                    // 将ASCII码转换成字符
+                    sb.append((char) result);
+                    break;
+                case 1:
+                    // 产生a-z的ASCII码
+                    result = Math.round(Math.random() * 25 + 97);
+                    sb.append((char) result);
+                    break;
+                case 2:
+                    // 产生0-9的数字
+                    sb.append(new Random().nextInt(10));
+                    break;
+            }
+        }
+        return sb.toString();
     }
 }

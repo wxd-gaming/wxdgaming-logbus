@@ -1,7 +1,7 @@
 sid: 1
-appId: 1
-appToken: h307ys9rF7c9
-logToken: 6cxCOK9twW40JEg6oBHOX5u1rHhrs61c
+appId: 2
+appToken: 8t73d45mIzAB
+logToken: bSV0Wsf99ohQ094UdW7818686Bg5s3n8
 portUrl: http://127.0.0.1:19000
 batch: true
 batchSize: 100

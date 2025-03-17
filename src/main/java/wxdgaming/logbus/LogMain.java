@@ -1,10 +1,5 @@
 package wxdgaming.logbus;
 
-import wxdgaming.boot2.core.CoreScan;
-import wxdgaming.boot2.core.RunApplication;
-import wxdgaming.boot2.core.util.JvmUtil;
-import wxdgaming.boot2.starter.WxdApplication;
-
 /**
  * 启动器
  *
@@ -17,16 +12,13 @@ public class LogMain {
         launch();
     }
 
-    public static RunApplication launch() {
-        return launch("log-boot.yml");
+    public static void launch() {
+        launch("log-boot.yml");
     }
 
-    public static RunApplication launch(String configName) {
-        JvmUtil.setProperty("boot.config", configName);
-        return WxdApplication.run(
-                CoreScan.class,
-                LogMain.class
-        );
+    public static void launch(String configName) {
+        BootConfig.init(configName);
+        LogBus.getInstance().init();
     }
 
 }

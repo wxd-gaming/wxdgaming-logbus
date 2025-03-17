@@ -1,24 +1,16 @@
 package run;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
-import wxdgaming.boot2.core.RunApplication;
-import wxdgaming.boot2.core.chatset.StringUtils;
-import wxdgaming.boot2.core.chatset.json.FastJsonUtil;
-import wxdgaming.boot2.core.collection.MapOf;
-import wxdgaming.boot2.core.format.HexId;
-import wxdgaming.boot2.core.io.FileWriteUtil;
-import wxdgaming.boot2.core.threading.ExecutorUtil;
-import wxdgaming.boot2.core.threading.TimerJob;
-import wxdgaming.boot2.core.timer.MyClock;
-import wxdgaming.boot2.core.util.RandomUtils;
-import wxdgaming.logbus.LogBus;
-import wxdgaming.logbus.LogMain;
+import wxdgaming.logbus.*;
 
-import java.time.LocalDateTime;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -30,41 +22,36 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class LogBusTest {
 
-    public static void main(String[] args) {
-        HashMap<Integer, List<JSONObject>> recordMap = new HashMap<>();
-        int days = 30;
-        LocalDateTime localDateTime = LocalDateTime.now().plusDays(-(days));
-        HexId hexId = new HexId(1);
-        for (int i = 1; i <= days; i++) {
-            /*模拟每天注册的人数*/
-            int random = RandomUtils.random(50, 200);
-            LocalDateTime time = localDateTime.plusDays(i);
-            long time2Milli = MyClock.time2Milli(time);
-            System.out.println(time);
-            List<JSONObject> list = recordMap.computeIfAbsent(i, k -> new ArrayList<>());
-            for (int j = 0; j < random; j++) {
-                JSONObject record = new JSONObject();
-                record.fluentPut("createTime", time2Milli);
-                record.fluentPut("account", i + "-" + j + "-" + StringUtils.randomString(6));
-                record.fluentPut("uid", hexId.newId());
-                list.add(record);
-            }
-        }
-        FileWriteUtil.writeString("src/test/resources/account.json", FastJsonUtil.toJsonFmt(recordMap));
-    }
+    static Path path = Path.of("src/test/resources/account.json");
+    static List<JSONObject> recordMap = new ArrayList<>();
 
-    final RunApplication application;
-    final LogBus logBus;
+    public static void main(String[] args) throws IOException {
+        HexId hexId = new HexId(1);
+        /*模拟每天注册的人数*/
+        int random = RandomUtils.random(50, 200);
+        for (int j = 0; j < random; j++) {
+            JSONObject record = new JSONObject();
+            record.fluentPut("createTime", System.currentTimeMillis());
+            record.fluentPut("account", j + "-" + LogBus.randomString(6));
+            record.fluentPut("uid", hexId.newId());
+            recordMap.add(record);
+        }
+        Files.createDirectories(path.getParent());
+        Files.writeString(path, JSON.toJSONString(recordMap));
+    }
 
     public LogBusTest(String configName) {
-        application = LogMain.launch(configName);
-        logBus = application.getInstance(LogBus.class);
+        LogMain.launch(configName);
+        LogBus.getInstance().addRoleLogType("role_copy_success", "副本通关");
+        try {
+            String string = Files.readString(path);
+            recordMap = JSON.parseArray(string, JSONObject.class);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public void test() {
-
-        logBus.addRoleLogType("role_copy_success", "副本通关");
-
+    public void postServer() {
         for (int i = 1; i <= 20; i++) {
             JSONObject record = new JSONObject();
             record.fluentPut("uid", i);
@@ -78,97 +65,114 @@ public class LogBusTest {
             record.fluentPut("port", 19000);
             record.fluentPut("webPort", 19001);
             record.fluentPut("status", "online");
-            record.fluentPut("other", MapOf.newJSONObject("version", "v1.0.1"));
-            logBus.push("", "server/pushList", record);
+            record.fluentPut("other", new JSONObject().fluentPut("version", "v1.0.1"));
+            LogBus.getInstance().push("", "server/pushList", record);
         }
+    }
 
-        for (int i = 0; i < 180; i++) {
-            String account = StringUtils.randomString(6);
+    public void test() {
+
+        for (JSONObject jsonObject : recordMap) {
+            long uid = jsonObject.getLongValue("uid");
+            String account = jsonObject.getString("account");
+            long createTime = jsonObject.getLongValue("createTime");
             /*创建账号*/
-            logBus.registerAccount(account, MapOf.newJSONObject("os", "xiaomi"));
-
+            LogBus.getInstance().registerAccount(account, new JSONObject().fluentPut("os", "xiaomi"));
             int sid = RandomUtils.random(1, 20);
-            long roleId = logBus.getHexId().newId();
 
             /*推送角色信息*/
-            logBus.pushRole(
-                    account, System.currentTimeMillis(),
+            LogBus.getInstance().pushRole(
+                    account, createTime,
                     sid, sid,
-                    roleId, account,
+                    uid, account,
                     "战士", "女", 1,
-                    MapOf.newJSONObject("os", "xiaomi")
+                    new JSONObject().fluentPut("os", "xiaomi")
             );
 
             if (RandomUtils.randomBoolean(3000)) continue;
 
-            logBus.pushLogin(account, roleId, account, 1, MapOf.newJSONObject("os", "xiaomi"));
+            LogBus.getInstance().pushLogin(account, uid, account, 1, new JSONObject().fluentPut("os", "xiaomi"));
 
             /*同步在线状态*/
-            TimerJob timerJob = ExecutorUtil.getInstance().getLogicExecutor().scheduleAtFixedDelay(
-                    () -> logBus.online(account, roleId),
+            ScheduledFuture<?> scheduledFuture = LogBus.getInstance().getScheduledExecutorService().scheduleWithFixedDelay(
+                    () -> LogBus.getInstance().online(account, uid),
                     10,
                     10,
                     TimeUnit.SECONDS
             );
 
             /*2分钟之后下线*/
-            ExecutorUtil.getInstance().getLogicExecutor().schedule(
+            LogBus.getInstance().getScheduledExecutorService().schedule(
                     () -> {
-                        timerJob.cancel();
-                        logBus.pushLogout(account, roleId, account, 1, MapOf.newJSONObject("os", "xiaomi"));
+                        scheduledFuture.cancel(false);
+                        LogBus.getInstance().pushLogout(account, uid, account, 1, new JSONObject().fluentPut("os", "xiaomi"));
                     },
                     RandomUtils.random(2, 5),
                     TimeUnit.MINUTES
             );
 
-            logBus.pushRoleLv(account, roleId, 2);
-
-            if (RandomUtils.randomBoolean(5500)) {/*35%概率会充值*/
-                List<Integer> integers = List.of(600, 1200, 6400, 9800, 12800, 25600, 48800, 64800);
-                /*充值日志*/
-                logBus.pushRecharge(
-                        account, roleId, account, 2,
-                        "huawei", RandomUtils.randomItem(integers)/*单位分*/, StringUtils.randomString(18), StringUtils.randomString(18),
-                        MapOf.newJSONObject("comment", "首充奖励")
-                );
-            }
+            LogBus.getInstance().pushRoleLv(account, uid, 2);
 
             /*3星通关副本*/
-            logBus.pushRoleLog(
+            LogBus.getInstance().pushRoleLog(
                     "role_copy_success",
-                    account, roleId, account, 1,
-                    MapOf.newJSONObject("copyId", RandomUtils.random(1001, 1102))
+                    account, uid, account, 1,
+                    new JSONObject().fluentPut("copyId", RandomUtils.random(1001, 1102))
                             .fluentPut("star", RandomUtils.random(1, 3))
-            );
-
-            /*上线奖励*/
-            int random = RandomUtils.random(100, 1000);
-            logBus.pushRoleItem(
-                    account, roleId, account, 2,
-                    RandomUtils.random(LogBus.ChangeTypeEnum.values()),
-                    RandomUtils.random(1000, 1010), "货币", false,
-                    random + 200,
-                    random,
-                    "货币", "货币", "上线奖励", "上线奖励",
-                    MapOf.newJSONObject()
             );
 
         }
     }
 
-    public static void testItem(LogBus logBus) {
+    public void pushItem() {
+        for (JSONObject jsonObject : recordMap) {
+            long uid = jsonObject.getLongValue("uid");
+            String account = jsonObject.getString("account");
+            long createTime = jsonObject.getLongValue("createTime");
+
+            /*上线奖励*/
+            testItem(account, uid);
+        }
+    }
+
+    public void testItem(String account, long roleId) {
 
         /*上线奖励*/
-        int random = RandomUtils.random(100, 1000);
-        logBus.pushRoleItem(
+        int itemId = RandomUtils.random(1000, 1110);
+        int change = RandomUtils.random(100, 1000);
+        LogBus.getInstance().pushRoleItem(
                 account, roleId, account, 2,
                 RandomUtils.random(LogBus.ChangeTypeEnum.values()),
-                RandomUtils.random(1000, 1010), "货币", false,
-                random + 200,
-                random,
+                itemId, "货币", false,
+                change + 200,
+                change,
                 "货币", "货币", "上线奖励", "上线奖励",
-                MapOf.newJSONObject()
+                new JSONObject()
         );
 
+    }
+
+    public void pushRecharge() {
+        for (JSONObject jsonObject : recordMap) {
+            long uid = jsonObject.getLongValue("uid");
+            String account = jsonObject.getString("account");
+            long createTime = jsonObject.getLongValue("createTime");
+            pushRecharge(account, uid);
+        }
+    }
+
+    public void pushRecharge(String account, long roleId) {
+        List<Integer> integers = List.of(600, 1200, 6400, 9800, 12800, 25600, 48800, 64800);
+        for (Integer amount : integers) {
+            if (RandomUtils.randomBoolean(5500)) {/*35%概率会充值*/
+                /*充值日志*/
+                LogBus.getInstance().pushRecharge(
+                        account, roleId, account, 2,
+                        "huawei", amount/*单位分*/,
+                        StringUtils.randomString(18), StringUtils.randomString(18),
+                        new JSONObject().fluentPut("comment", "首充奖励")
+                );
+            }
+        }
     }
 }
