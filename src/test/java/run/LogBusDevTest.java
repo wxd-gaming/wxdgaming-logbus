@@ -18,7 +18,7 @@ public class LogBusDevTest extends LogBusTest {
 
     public static void main(String[] args) {
         LogBusDevTest logBusDevTest = new LogBusDevTest("log-boot-dev.yml");
-        // logBusDevTest.test();
+        logBusDevTest.test();
         // for (int i = 0; i < 1000; i++) {
         //     for (int j = 0; j < 1000; j++) {
         //         logBusDevTest.pushItem();

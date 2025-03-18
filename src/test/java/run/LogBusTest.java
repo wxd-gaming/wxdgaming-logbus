@@ -3,6 +3,7 @@ package run;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
+import wxdgaming.logbus.BootConfig;
 import wxdgaming.logbus.HexId;
 import wxdgaming.logbus.LogBus;
 import wxdgaming.logbus.LogMain;
@@ -47,12 +48,28 @@ public class LogBusTest {
     public LogBusTest(String configName) {
         LogMain.launch(configName);
         LogBus.getInstance().addRoleLogType("role_copy_success", "副本通关");
+        LogBus.getInstance().addServerLogType("server_rank_lv", "排行榜");
         try {
             String string = Files.readString(path);
             recordMap = JSON.parseArray(string, JSONObject.class);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        postServer();
+
+        for (int i = 0; i < recordMap.size(); i++) {
+            JSONObject jsonObject = recordMap.get(i);
+            long uid = jsonObject.getLongValue("uid");
+            String account = jsonObject.getString("account");
+            JSONObject rank = new JSONObject()
+                    .fluentPut("rank", i + 1)
+                    .fluentPut("uid", uid)
+                    .fluentPut("account", account);
+            LogBus.getInstance().pushServerLog("server_rank_lv", BootConfig.getIns().getSid() * 10000L + i + 1, rank);
+            if (i >= 99) break;
+        }
+
+
     }
 
     public void postServer() {
@@ -68,6 +85,7 @@ public class LogBusTest {
             record.fluentPut("lan", "192.168.137.10");
             record.fluentPut("port", 19000);
             record.fluentPut("webPort", 19001);
+            record.fluentPut("registerRoleCount", RandomUtils.random(100, 1000));
             record.fluentPut("status", "online");
             record.fluentPut("other", new JSONObject().fluentPut("version", "v1.0.1"));
             LogBus.getInstance().push("", "server/pushList", record);
@@ -152,7 +170,7 @@ public class LogBusTest {
                 change + 200,
                 change,
                 "货币", "货币", "上线奖励", "上线奖励",
-                new JSONObject()
+                new JSONObject().fluentPut("shopId", RandomUtils.random(1, 10))
         );
 
     }
@@ -175,7 +193,7 @@ public class LogBusTest {
                         account, roleId, account, 2,
                         "huawei", amount/*单位分*/,
                         StringUtils.randomString(18), StringUtils.randomString(18),
-                        new JSONObject().fluentPut("comment", "首充奖励")
+                        new JSONObject().fluentPut("shopId", RandomUtils.random(1, 10)).fluentPut("comment", "首充奖励")
                 );
             }
         }

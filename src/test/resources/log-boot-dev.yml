@@ -4,7 +4,7 @@ appToken: V176DeX83h4l
 logToken: W795Qv4116ho70We21cEx548378k73by
 portUrl: http://211.149.228.9:19000
 batch: true
-batchSize: 100
+batchSize: 500
 
 executorCoreSize: 4                        #默认线程池的核心线程数
 

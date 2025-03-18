@@ -86,6 +86,7 @@ public class LogBus {
             scheduledExecutorService.scheduleWithFixedDelay(
                     () -> {
                         try {
+                            if (!Files.exists(path)) return;
                             List<Path> list1 = Files.walk(path, 99)
                                     .filter(Files::isRegularFile)
                                     .filter(v -> System.currentTimeMillis() - v.toFile().lastModified() > 2000)
@@ -376,13 +377,29 @@ public class LogBus {
         push(account, "log/role/item/pushList", jsonObject);
     }
 
+    /**
+     * 根据角色相关的通用的日志
+     *
+     * @param logType 日志类型
+     * @param uid     日志id
+     * @param other   附加的信息
+     * @author: wxd-gaming(無心道, 15388152619)
+     * @version: 2025-03-13 09:03
+     */
+    public void pushServerLog(String logType, long uid, JSONObject other) {
+        JSONObject jsonObject = new JSONObject()
+                .fluentPut("logType", logType)
+                .fluentPut("uid", uid)/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
+                .fluentPut("sid", BootConfig.getIns().getSid())
+                .fluentPut("other", other);
+        push("", "log/server/slog/pushList", jsonObject);
+    }
 
     public void push(String key, String url, JSONObject data) {
         lock.lock();
         try {
             key = java.lang.String.valueOf(key.hashCode() % 20);
-            key = "";
-            SplitCollection<JSONObject> collection = logMap.computeIfAbsent(key, url, k -> new SplitCollection<>(BootConfig.getIns().getBatchSize()));
+            SplitCollection<JSONObject> collection = logMap.computeIfAbsent("", url, k -> new SplitCollection<>(BootConfig.getIns().getBatchSize()));
             collection.add(data);
         } finally {
             lock.unlock();
