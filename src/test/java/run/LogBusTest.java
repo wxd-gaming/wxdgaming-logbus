@@ -87,7 +87,11 @@ public class LogBusTest {
             record.fluentPut("webPort", 19001);
             record.fluentPut("registerRoleCount", RandomUtils.random(100, 1000));
             record.fluentPut("status", "online");
-            record.fluentPut("other", new JSONObject().fluentPut("version", "v1.0.1"));
+            record.fluentPut(
+                    "other", new JSONObject()
+                            .fluentPut("version", "v1.0.1")
+                            .fluentPut("client-version", "1001")
+            );
             LogBus.getInstance().push("", "server/pushList", record);
         }
     }
