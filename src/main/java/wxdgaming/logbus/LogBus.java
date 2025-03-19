@@ -206,6 +206,48 @@ public class LogBus {
         }
     }
 
+    /**
+     * 开新服配置
+     *
+     * @param sid      服务器id
+     * @param group    分组信息，比如1-100，101-200
+     * @param ordinal  显示顺序
+     * @param label    标签 比如new-新服，recommend-推荐服
+     * @param name     名字
+     * @param openTime 开服时间
+     * @param wlan     外网IP 或者域名
+     * @param lan      内网IP 或者域名
+     * @param port     端口
+     * @param webPort  web端口
+     * @author: wxd-gaming(無心道, 15388152619)
+     * @version: 2025-03-19 10:05
+     */
+    public void addServer(int sid, String group, int ordinal, String label, String name, long openTime, String wlan, String lan, int port, int webPort) {
+        JSONObject record = new JSONObject();
+        record.fluentPut("uid", sid);
+        record.fluentPut("group", group);
+        record.fluentPut("ordinal", ordinal);
+        record.fluentPut("label", label);
+        record.fluentPut("name", name);
+        record.fluentPut("openTime", openTime);
+        record.fluentPut("wlan", wlan);
+        record.fluentPut("lan", lan);
+        record.fluentPut("port", port);
+        record.fluentPut("webPort", webPort);
+
+        push("", "server/addList", record);
+    }
+
+    /** 同步游戏数据，比如版本号等 */
+    public void pushServer(int sid, int mainSid, int roleCount, JSONObject other) {
+        JSONObject record = new JSONObject();
+        record.fluentPut("uid", sid);
+        record.fluentPut("mainSid", mainSid);
+        record.fluentPut("registerRoleCount", roleCount);
+        record.fluentPut("other", other);
+        push("", "server/pushList", record);
+    }
+
     /** 创建一个账号 */
     public void registerAccount(String account, JSONObject other) {
         registerAccount(account, System.currentTimeMillis(), other);
@@ -221,14 +263,13 @@ public class LogBus {
     }
 
     /** 创建角色或者修改角色数据 */
-    public void pushRole(String account, long createTime, int sid, int curSid, long roleId, String roleName, String job, String sex, int lv, JSONObject other) {
+    public void pushRole(int sid, String account, long createTime, long roleId, String roleName, String job, String sex, int lv, JSONObject other) {
 
         JSONObject record = new JSONObject();
         record.put("uid", roleId);
         record.put("account", account);
         record.put("createTime", createTime);
-        record.put("createSid", sid);
-        record.put("curSid", curSid);
+        record.put("sid", sid);
         record.put("roleName", roleName);
         record.put("Job", job);
         record.put("sex", sex);
@@ -249,20 +290,6 @@ public class LogBus {
         push(account, "log/role/lvList", record);
     }
 
-    public void pushLogin(String account, long roleId, String roleName, int lv, JSONObject other) {
-        JSONObject jsonObject = new JSONObject()
-                .fluentPut("logEnum", "LOGIN")
-                .fluentPut("uid", hexId.newId())/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
-                .fluentPut("createTime", System.currentTimeMillis())
-                .fluentPut("sid", BootConfig.getIns().getSid())
-                .fluentPut("account", account)
-                .fluentPut("roleId", roleId)
-                .fluentPut("roleName", roleName)
-                .fluentPut("lv", lv)
-                .fluentPut("other", other);
-        push(account, "log/role/login/pushList", jsonObject);
-    }
-
     /** 同步在线状态 建议每分钟一次 */
     public void online(String account, long roleId) {
         JSONObject jsonObject = new JSONObject()
@@ -272,12 +299,34 @@ public class LogBus {
         push(account, "log/role/login/onlineList", jsonObject);
     }
 
+    public void pushLogin(String account, long roleId, String roleName, int lv, JSONObject other) {
+        pushLogin(BootConfig.getIns().getSid(), account, roleId, roleName, lv, other);
+    }
+
+    public void pushLogin(int sid, String account, long roleId, String roleName, int lv, JSONObject other) {
+        JSONObject jsonObject = new JSONObject()
+                .fluentPut("logEnum", "LOGIN")
+                .fluentPut("uid", hexId.newId())/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
+                .fluentPut("createTime", System.currentTimeMillis())
+                .fluentPut("sid", sid)
+                .fluentPut("account", account)
+                .fluentPut("roleId", roleId)
+                .fluentPut("roleName", roleName)
+                .fluentPut("lv", lv)
+                .fluentPut("other", other);
+        push(account, "log/role/login/pushList", jsonObject);
+    }
+
     public void pushLogout(String account, long roleId, String roleName, int lv, JSONObject other) {
+        pushLogout(BootConfig.getIns().getSid(), account, roleId, roleName, lv, other);
+    }
+
+    public void pushLogout(int sid, String account, long roleId, String roleName, int lv, JSONObject other) {
         JSONObject jsonObject = new JSONObject()
                 .fluentPut("logEnum", "LOGOUT")
                 .fluentPut("uid", hexId.newId())/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
                 .fluentPut("createTime", System.currentTimeMillis())
-                .fluentPut("sid", BootConfig.getIns().getSid())
+                .fluentPut("sid", sid)
                 .fluentPut("account", account)
                 .fluentPut("roleId", roleId)
                 .fluentPut("roleName", roleName)
@@ -289,10 +338,16 @@ public class LogBus {
     public void pushRecharge(String account, long roleId, String roleName, int lv,
                              String channel, long amount, String spOrder, String cpOrder,
                              JSONObject other) {
+        pushRecharge(BootConfig.getIns().getSid(), account, roleId, roleName, lv, channel, amount, spOrder, cpOrder, other);
+    }
+
+    public void pushRecharge(int sid, String account, long roleId, String roleName, int lv,
+                             String channel, long amount, String spOrder, String cpOrder,
+                             JSONObject other) {
         JSONObject jsonObject = new JSONObject()
                 .fluentPut("uid", hexId.newId())/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
                 .fluentPut("createTime", System.currentTimeMillis())
-                .fluentPut("sid", BootConfig.getIns().getSid())
+                .fluentPut("sid", sid)
                 .fluentPut("account", account)
                 .fluentPut("roleId", roleId)
                 .fluentPut("roleName", roleName)
@@ -318,11 +373,15 @@ public class LogBus {
      * @version: 2025-03-13 09:03
      */
     public void pushRoleLog(String logType, String account, long roleId, String roleName, int lv, JSONObject other) {
+        pushRoleLog(logType, BootConfig.getIns().getSid(), account, roleId, roleName, lv, other);
+    }
+
+    public void pushRoleLog(String logType, int sid, String account, long roleId, String roleName, int lv, JSONObject other) {
         JSONObject jsonObject = new JSONObject()
                 .fluentPut("logType", logType)
                 .fluentPut("uid", hexId.newId())/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
                 .fluentPut("createTime", System.currentTimeMillis())
-                .fluentPut("sid", BootConfig.getIns().getSid())
+                .fluentPut("sid", sid)
                 .fluentPut("account", account)
                 .fluentPut("roleId", roleId)
                 .fluentPut("roleName", roleName)
@@ -355,10 +414,25 @@ public class LogBus {
                              String itemType, String itemSubType,
                              String source, String comment,
                              JSONObject other) {
+        pushRoleItem(
+                BootConfig.getIns().getSid(),
+                account, roleId, roleName, lv,
+                changeType, itemId, itemName, itemBind, itemCount, change,
+                itemType, itemSubType, source, comment,
+                other
+        );
+    }
+
+    public void pushRoleItem(int sid, String account, long roleId, String roleName, int lv,
+                             ChangeTypeEnum changeType,
+                             int itemId, String itemName, boolean itemBind, long itemCount, long change,
+                             String itemType, String itemSubType,
+                             String source, String comment,
+                             JSONObject other) {
         JSONObject jsonObject = new JSONObject()
                 .fluentPut("uid", hexId.newId())/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
                 .fluentPut("createTime", System.currentTimeMillis())
-                .fluentPut("sid", BootConfig.getIns().getSid())
+                .fluentPut("sid", sid)
                 .fluentPut("account", account)
                 .fluentPut("roleId", roleId)
                 .fluentPut("roleName", roleName)
@@ -387,15 +461,19 @@ public class LogBus {
      * @version: 2025-03-13 09:03
      */
     public void pushServerLog(String logType, long uid, JSONObject other) {
+        pushServerLog(logType, BootConfig.getIns().getSid(), uid, other);
+    }
+
+    public void pushServerLog(String logType, int sid, long uid, JSONObject other) {
         JSONObject jsonObject = new JSONObject()
                 .fluentPut("logType", logType)
                 .fluentPut("uid", uid)/*指定一个唯一id，这样可以避免因为网络重复提交导致出现重复数据*/
-                .fluentPut("sid", BootConfig.getIns().getSid())
+                .fluentPut("sid", sid)
                 .fluentPut("other", other);
         push("", "log/server/slog/pushList", jsonObject);
     }
 
-    public void push(String key, String url, JSONObject data) {
+    private void push(String key, String url, JSONObject data) {
         lock.lock();
         try {
             key = java.lang.String.valueOf(key.hashCode() % 20);

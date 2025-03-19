@@ -2,8 +2,8 @@ package run;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import lombok.extern.slf4j.Slf4j;
-import wxdgaming.logbus.BootConfig;
 import wxdgaming.logbus.HexId;
 import wxdgaming.logbus.LogBus;
 import wxdgaming.logbus.LogMain;
@@ -39,10 +39,11 @@ public class LogBusTest {
             record.fluentPut("createTime", System.currentTimeMillis());
             record.fluentPut("account", j + "-" + StringUtils.randomString(6));
             record.fluentPut("uid", hexId.newId());
+            record.fluentPut("sid", RandomUtils.random(1, 20));
             recordMap.add(record);
         }
         Files.createDirectories(path.getParent());
-        Files.writeString(path, JSON.toJSONString(recordMap));
+        Files.writeString(path, JSON.toJSONString(recordMap, SerializerFeature.PrettyFormat));
     }
 
     public LogBusTest(String configName) {
@@ -55,44 +56,53 @@ public class LogBusTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        postServer();
+        addServer();
+        pushServer();
 
+        /*模拟推送本服排行榜*/
         for (int i = 0; i < recordMap.size(); i++) {
             JSONObject jsonObject = recordMap.get(i);
             long uid = jsonObject.getLongValue("uid");
             String account = jsonObject.getString("account");
+
+            int sid = jsonObject.getIntValue("sid");
+
             JSONObject rank = new JSONObject()
                     .fluentPut("rank", i + 1)
                     .fluentPut("uid", uid)
                     .fluentPut("account", account);
-            LogBus.getInstance().pushServerLog("server_rank_lv", BootConfig.getIns().getSid() * 10000L + i + 1, rank);
+
+            LogBus.getInstance().pushServerLog(
+                    "server_rank_lv",
+                    sid * 10000L + i + 1 /*通过固定uid形式选择覆盖日志记录*/,
+                    rank
+            );
             if (i >= 99) break;
         }
 
-
     }
 
-    public void postServer() {
+    public void addServer() {
         for (int i = 1; i <= 20; i++) {
-            JSONObject record = new JSONObject();
-            record.fluentPut("uid", i);
-            record.fluentPut("mainSid", 0);
-            record.fluentPut("name", "测试服-" + i);
-            record.fluentPut("showName", "测试服-" + i);
-            record.fluentPut("openTime", "2025-01-24 14:02");
-            record.fluentPut("maintainTime", "2025-01-24 14:02");
-            record.fluentPut("wlan", "wxd-gaming");
-            record.fluentPut("lan", "192.168.137.10");
-            record.fluentPut("port", 19000);
-            record.fluentPut("webPort", 19001);
-            record.fluentPut("registerRoleCount", RandomUtils.random(100, 1000));
-            record.fluentPut("status", "online");
-            record.fluentPut(
-                    "other", new JSONObject()
-                            .fluentPut("version", "v1.0.1")
-                            .fluentPut("client-version", "1001")
+            LogBus.getInstance().addServer(
+                    i,
+                    "1-100", 1, "new",
+                    "正式" + i + "服",
+                    System.currentTimeMillis(),
+                    "127.0.0.1", "127.0.0.1", 19000, 19000
             );
-            LogBus.getInstance().push("", "server/pushList", record);
+        }
+    }
+
+    public void pushServer() {
+        for (int i = 1; i <= 20; i++) {
+            LogBus.getInstance().pushServer(
+                    i,
+                    0,
+                    RandomUtils.random(100, 1000),
+                    new JSONObject()
+                            .fluentPut("version", "v1.0.1")
+                            .fluentPut("client-version", "1001"));
         }
     }
 
@@ -102,14 +112,13 @@ public class LogBusTest {
             long uid = jsonObject.getLongValue("uid");
             String account = jsonObject.getString("account");
             long createTime = jsonObject.getLongValue("createTime");
+            int sid = jsonObject.getIntValue("sid");
             /*创建账号*/
             LogBus.getInstance().registerAccount(account, new JSONObject().fluentPut("os", "xiaomi"));
-            int sid = RandomUtils.random(1, 20);
 
             /*推送角色信息*/
             LogBus.getInstance().pushRole(
-                    account, createTime,
-                    sid, sid,
+                    sid, account, createTime,
                     uid, account,
                     "战士", "女", 1,
                     new JSONObject().fluentPut("os", "xiaomi")
@@ -117,7 +126,7 @@ public class LogBusTest {
 
             if (RandomUtils.randomBoolean(3000)) continue;
 
-            LogBus.getInstance().pushLogin(account, uid, account, 1, new JSONObject().fluentPut("os", "xiaomi"));
+            LogBus.getInstance().pushLogin(sid, account, uid, account, 1, new JSONObject().fluentPut("os", "xiaomi"));
 
             /*同步在线状态*/
             ScheduledFuture<?> scheduledFuture = LogBus.getInstance().getScheduledExecutorService().scheduleWithFixedDelay(
@@ -131,7 +140,7 @@ public class LogBusTest {
             LogBus.getInstance().getScheduledExecutorService().schedule(
                     () -> {
                         scheduledFuture.cancel(false);
-                        LogBus.getInstance().pushLogout(account, uid, account, 1, new JSONObject().fluentPut("os", "xiaomi"));
+                        LogBus.getInstance().pushLogout(sid, account, uid, account, 1, new JSONObject().fluentPut("os", "xiaomi"));
                     },
                     RandomUtils.random(2, 5),
                     TimeUnit.MINUTES
@@ -139,12 +148,14 @@ public class LogBusTest {
 
             LogBus.getInstance().pushRoleLv(account, uid, 2);
 
-            pushRecharge(account, uid);
+            pushRecharge(sid, account, uid);
             /*3星通关副本*/
             LogBus.getInstance().pushRoleLog(
                     "role_copy_success",
+                    sid,
                     account, uid, account, 1,
-                    new JSONObject().fluentPut("copyId", RandomUtils.random(1001, 1102))
+                    new JSONObject()
+                            .fluentPut("copyId", RandomUtils.random(1001, 1102))
                             .fluentPut("star", RandomUtils.random(1, 3))
             );
 
@@ -156,19 +167,19 @@ public class LogBusTest {
             long uid = jsonObject.getLongValue("uid");
             String account = jsonObject.getString("account");
             long createTime = jsonObject.getLongValue("createTime");
-
+            int sid = jsonObject.getIntValue("sid");
             /*上线奖励*/
-            testItem(account, uid);
+            testItem(sid, account, uid);
         }
     }
 
-    public void testItem(String account, long roleId) {
+    public void testItem(int sid, String account, long roleId) {
 
         /*上线奖励*/
         int itemId = RandomUtils.random(1000, 1110);
         int change = RandomUtils.random(100, 1000);
         LogBus.getInstance().pushRoleItem(
-                account, roleId, account, 2,
+                sid, account, roleId, account, 2,
                 RandomUtils.random(LogBus.ChangeTypeEnum.values()),
                 itemId, "货币", false,
                 change + 200,
@@ -184,17 +195,18 @@ public class LogBusTest {
             long uid = jsonObject.getLongValue("uid");
             String account = jsonObject.getString("account");
             long createTime = jsonObject.getLongValue("createTime");
-            pushRecharge(account, uid);
+            int sid = jsonObject.getIntValue("sid");
+            pushRecharge(sid, account, uid);
         }
     }
 
-    public void pushRecharge(String account, long roleId) {
+    public void pushRecharge(int sid, String account, long roleId) {
         List<Integer> integers = List.of(600, 1200, 6400, 9800, 12800, 25600, 48800, 64800);
         for (Integer amount : integers) {
             if (RandomUtils.randomBoolean(5500)) {/*35%概率会充值*/
                 /*充值日志*/
                 LogBus.getInstance().pushRecharge(
-                        account, roleId, account, 2,
+                        sid, account, roleId, account, 2,
                         "huawei", amount/*单位分*/,
                         StringUtils.randomString(18), StringUtils.randomString(18),
                         new JSONObject().fluentPut("shopId", RandomUtils.random(1, 10)).fluentPut("comment", "首充奖励")
