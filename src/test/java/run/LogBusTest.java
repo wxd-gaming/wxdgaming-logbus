@@ -15,6 +15,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -59,27 +61,36 @@ public class LogBusTest {
         addServer();
         pushServer();
 
-        /*模拟推送本服排行榜*/
+        TreeMap<Integer, TreeMap<Long, JSONObject>> serverAccounts = new TreeMap<>();
         for (int i = 0; i < recordMap.size(); i++) {
             JSONObject jsonObject = recordMap.get(i);
-            long uid = jsonObject.getLongValue("uid");
-            String account = jsonObject.getString("account");
-
             int sid = jsonObject.getIntValue("sid");
-
-            JSONObject rank = new JSONObject()
-                    .fluentPut("rank", i + 1)
-                    .fluentPut("uid", uid)
-                    .fluentPut("account", account);
-
-            LogBus.getInstance().pushServerLog(
-                    "server_rank_lv",
-                    sid * 10000L + i + 1 /*通过固定uid形式选择覆盖日志记录*/,
-                    rank
-            );
-            if (i >= 99) break;
+            long uid = jsonObject.getLongValue("uid");
+            serverAccounts.computeIfAbsent(sid, k -> new TreeMap<>())
+                    .put(uid, jsonObject);
         }
+        for (Map.Entry<Integer, TreeMap<Long, JSONObject>> mapEntry : serverAccounts.entrySet()) {
+            Integer sid = mapEntry.getKey();
+            TreeMap<Long, JSONObject> map = mapEntry.getValue();
+            int rank = 0;
+            for (Map.Entry<Long, JSONObject> objectEntry : map.entrySet()) {
+                rank++;
+                long uid = objectEntry.getValue().getLongValue("uid");
+                String account = objectEntry.getValue().getString("account");
 
+                JSONObject rankData = new JSONObject()
+                        .fluentPut("rank", rank)
+                        .fluentPut("uid", uid)
+                        .fluentPut("account", account);
+
+                LogBus.getInstance().pushServerLog(
+                        "server_rank_lv",
+                        sid,
+                        sid * 10000L + rank /*通过固定uid形式选择覆盖日志记录*/,
+                        rankData
+                );
+            }
+        }
     }
 
     public void addServer() {
@@ -114,7 +125,7 @@ public class LogBusTest {
             long createTime = jsonObject.getLongValue("createTime");
             int sid = jsonObject.getIntValue("sid");
             /*创建账号*/
-            LogBus.getInstance().registerAccount(account, new JSONObject().fluentPut("os", "xiaomi"));
+            LogBus.getInstance().registerAccount(account, createTime, new JSONObject().fluentPut("os", "xiaomi"));
 
             /*推送角色信息*/
             LogBus.getInstance().pushRole(
@@ -159,6 +170,7 @@ public class LogBusTest {
                             .fluentPut("star", RandomUtils.random(1, 3))
             );
 
+            pushItem(sid, account, uid);
         }
     }
 
@@ -169,11 +181,11 @@ public class LogBusTest {
             long createTime = jsonObject.getLongValue("createTime");
             int sid = jsonObject.getIntValue("sid");
             /*上线奖励*/
-            testItem(sid, account, uid);
+            pushItem(sid, account, uid);
         }
     }
 
-    public void testItem(int sid, String account, long roleId) {
+    public void pushItem(int sid, String account, long roleId) {
 
         /*上线奖励*/
         int itemId = RandomUtils.random(1000, 1110);
