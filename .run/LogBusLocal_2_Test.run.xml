@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="LogBusLocal_1_Test" type="Application" factoryName="Application" nameIsGenerated="true">
-    <option name="MAIN_CLASS_NAME" value="run.LogBusLocal_1_Test" />
+  <configuration default="false" name="LogBusLocal_2_Test" type="Application" factoryName="Application" nameIsGenerated="true">
+    <option name="MAIN_CLASS_NAME" value="run.LogBusLocal_2_Test" />
     <module name="wxdgaming.logbus" />
     <option name="WORKING_DIRECTORY" value="$MODULE_WORKING_DIR$" />
     <extension name="coverage">

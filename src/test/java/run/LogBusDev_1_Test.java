@@ -9,16 +9,16 @@ import lombok.extern.slf4j.Slf4j;
  * @version: 2025-03-12 20:48
  **/
 @Slf4j
-public class LogBusDevTest extends LogBusTest {
+public class LogBusDev_1_Test extends LogBusTest {
 
 
-    public LogBusDevTest(String configName) {
+    public LogBusDev_1_Test(String configName) {
         super(configName);
     }
 
     public static void main(String[] args) {
-        LogBusDevTest logBusDevTest = new LogBusDevTest("log-boot-dev.yml");
-        logBusDevTest.test();
+        LogBusDev_1_Test logBusDev1Test = new LogBusDev_1_Test("log-boot-dev.yml");
+        logBusDev1Test.test();
         // for (int i = 0; i < 1000; i++) {
         //     for (int j = 0; j < 1000; j++) {
         //         logBusDevTest.pushItem();

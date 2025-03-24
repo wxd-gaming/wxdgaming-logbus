@@ -16,7 +16,7 @@ public class LogBusLocal_2_Test extends LogBusTest {
     }
 
     public static void main(String[] args) {
-        LogBusLocal_2_Test local_2_test = new LogBusLocal_2_Test("log-boot-local-2.yml");
+        LogBusLocal_2_Test local_2_test = new LogBusLocal_2_Test("log-boot-local2.yml");
         local_2_test.test();
     }
 

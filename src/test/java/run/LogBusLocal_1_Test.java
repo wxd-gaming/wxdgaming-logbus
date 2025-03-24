@@ -9,15 +9,15 @@ import lombok.extern.slf4j.Slf4j;
  * @version: 2025-03-12 20:48
  **/
 @Slf4j
-public class LogBusLocalTest extends LogBusTest {
+public class LogBusLocal_1_Test extends LogBusTest {
 
-    public LogBusLocalTest(String configName) {
+    public LogBusLocal_1_Test(String configName) {
         super(configName);
     }
 
     public static void main(String[] args) {
-        LogBusLocalTest logBusLocalTest = new LogBusLocalTest("log-boot-local.yml");
-        logBusLocalTest.test();
+        LogBusLocal_1_Test logBusLocal1Test = new LogBusLocal_1_Test("log-boot-local.yml");
+        logBusLocal1Test.test();
         // for (int i = 0; i < 1000; i++) {
         //     for (int j = 0; j < 1000; j++) {
         //         logBusLocalTest.pushItem();
