@@ -100,7 +100,8 @@ public class LogBusTest {
                     "1-100", 1, "new",
                     "正式" + i + "服",
                     System.currentTimeMillis(),
-                    "127.0.0.1", "127.0.0.1", 19000, 19000
+                    "127.0.0.1", "127.0.0.1", 19000, 19000,
+                    true
             );
         }
     }
@@ -109,7 +110,7 @@ public class LogBusTest {
         for (int i = 1; i <= 20; i++) {
             LogBus.getInstance().pushServer(
                     i,
-                    0,
+                    0, true,
                     RandomUtils.random(100, 1000),
                     new JSONObject()
                             .fluentPut("version", "v1.0.1")

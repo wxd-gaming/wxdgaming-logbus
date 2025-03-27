@@ -222,7 +222,7 @@ public class LogBus {
      * @author: wxd-gaming(無心道, 15388152619)
      * @version: 2025-03-19 10:05
      */
-    public void addServer(int sid, String group, int ordinal, String label, String name, long openTime, String wlan, String lan, int port, int webPort) {
+    public void addServer(int sid, String group, int ordinal, String label, String name, long openTime, String wlan, String lan, int port, int webPort, boolean enabled) {
         JSONObject record = new JSONObject();
         record.fluentPut("uid", sid);
         record.fluentPut("group", group);
@@ -234,15 +234,17 @@ public class LogBus {
         record.fluentPut("lan", lan);
         record.fluentPut("port", port);
         record.fluentPut("webPort", webPort);
+        record.fluentPut("enabled", enabled);
 
         push("", "server/addList", record);
     }
 
     /** 同步游戏数据，比如版本号等 */
-    public void pushServer(int sid, int mainSid, int roleCount, JSONObject other) {
+    public void pushServer(int sid, int mainSid, boolean enabled, int roleCount, JSONObject other) {
         JSONObject record = new JSONObject();
         record.fluentPut("uid", sid);
         record.fluentPut("mainSid", mainSid);
+        record.fluentPut("enabled", enabled);
         record.fluentPut("registerRoleCount", roleCount);
         record.fluentPut("other", other);
         push("", "server/pushList", record);
