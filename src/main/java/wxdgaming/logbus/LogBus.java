@@ -1,6 +1,5 @@
 package wxdgaming.logbus;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -12,16 +11,12 @@ import wxdgaming.logbus.http.Response;
 import wxdgaming.logbus.util.FileUtil;
 import wxdgaming.logbus.util.StringUtils;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -45,12 +40,13 @@ public class LogBus {
     private ScheduledExecutorService scheduledExecutorService;
     private HexId hexId;
     private AtomicLong postHash = new AtomicLong(0);
-    private SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd/HH");
+    private HashMap<Path, PostRunnable> postRunnableMap = new HashMap(0);
+
 
     public void init() {
         this.hexId = new HexId(BootConfig.getIns().getSid());
         this.scheduledExecutorService = Executors.newScheduledThreadPool(BootConfig.getIns().getExecutorCoreSize() + 2);
-        String pathBase = "target/post/" + BootConfig.getIns().getAppId();
+        Path pathBase = Paths.get("target", "post", String.valueOf(BootConfig.getIns().getAppId()));
 
         scheduledExecutorService.scheduleWithFixedDelay(
                 () -> {
@@ -65,13 +61,14 @@ public class LogBus {
                     }
                     for (Map.Entry<String, LinkedHashMap<String, SplitCollection<JSONObject>>> mapEntry : tmpMap.entrySet()) {
                         for (Map.Entry<String, SplitCollection<JSONObject>> entry : mapEntry.getValue().entrySet()) {
+                            String postUrl = entry.getKey();
                             SplitCollection<JSONObject> value = entry.getValue();
                             while (!value.isEmpty()) {
                                 List<JSONObject> jsonObjects = value.removeFirst();
                                 long l = postHash.incrementAndGet();
                                 long hash = l % BootConfig.getIns().getExecutorCoreSize();
-                                String path = pathBase + "/" + hash + "/" + System.nanoTime() + "-" + StringUtils.randomString(4) + ".dat";
-                                FileUtil.writeLog2File(path, entry.getKey(), jsonObjects);
+                                Path path = pathBase.resolve(String.valueOf(hash)).resolve("data").resolve(System.nanoTime() + "-" + StringUtils.randomString(4) + ".dat");
+                                FileUtil.writeLog2File(path, postUrl, jsonObjects);
                             }
                         }
                     }
@@ -80,91 +77,32 @@ public class LogBus {
                 33,
                 TimeUnit.MILLISECONDS
         );
-        for (int i = 0; i < BootConfig.getIns().getExecutorCoreSize(); i++) {
-            final Path path = Path.of(pathBase, String.valueOf(i));
-            /*本次没执行完成不执行下一个*/
-            scheduledExecutorService.scheduleWithFixedDelay(
-                    () -> {
-                        try {
-                            if (!Files.exists(path)) return;
-                            List<Path> list1 = Files.walk(path, 99)
-                                    .filter(Files::isRegularFile)
-                                    .filter(v -> System.currentTimeMillis() - v.toFile().lastModified() > 2000)
-                                    .filter(v -> v.getFileName().toString().endsWith(".dat")).toList();
 
-                            if (list1.isEmpty()) return;
-                            CountDownLatch countDownLatch = new CountDownLatch(list1.size());
-                            list1.forEach(logFilePath -> {
-                                try {
-                                    int postCount = 0;
-                                    String url = null;
-                                    List<JSONObject> jsonData = null;
-                                    try {
-                                        List<String> list = Files.lines(logFilePath, StandardCharsets.UTF_8).toList();
-                                        postCount = Integer.parseInt(list.get(0));
-                                        url = list.get(1);
-                                        jsonData = JSON.parseArray(list.get(2), JSONObject.class);
-                                    } catch (Exception e) {
-                                        log.error("logbus walk error {}", path, e);
-                                        try {
-                                            Files.delete(logFilePath);
-                                        } catch (IOException ex) {
-                                            ex.printStackTrace(System.err);
-                                        }
-                                    }
-                                    if (url == null || url.isBlank()) {
-                                        return;
-                                    }
-                                    try {
-                                        JSONObject postData = new JSONObject();
-                                        postData.put("gameId", BootConfig.getIns().getAppId());
-                                        postData.put("token", BootConfig.getIns().getLogToken());
-                                        postData.put("data", jsonData);
-                                        Response<PostJson> request = new PostJson(HttpClientPool.getDefault(), BootConfig.getIns().getPortUrl() + "/" + url)
-                                                .setParams(postData.toJSONString())
-                                                .readTimeout(130000)
-                                                .retry(2)
-                                                .request();
-                                        if (request.responseCode() != 200 || JSONObject.parseObject(request.bodyString()).getInteger("code") != 1) {
-                                            log.info("logbus push {} fail {}", url, request.bodyString());
-                                        } else {
-                                            try {
-                                                Files.delete(logFilePath);
-                                            } catch (Exception ignored) {}
-                                        }
-                                    } catch (Exception e) {
-                                        try {
-                                            postCount++;
-                                            if (postCount > 10) {
-                                                String errorPathString = path.toString() + "/error/" + sdf.format(new Date()) + "/" + System.nanoTime() + "-" + StringUtils.randomString(4) + ".log";
-                                                log.error("logbus push {} fail error log file {}", logFilePath, errorPathString, e);
-                                                FileUtil.writeString2File(errorPathString, "%s\n%s".formatted(url, JSON.toJSONString(jsonData)));
-                                                Files.delete(logFilePath);
-                                            } else {
-                                                FileUtil.writeString2File(logFilePath.toString(), "%s\n%s\n%s".formatted(postCount, url, JSON.toJSONString(jsonData)));
-                                            }
-                                        } catch (Exception ee) {
-                                            log.error("logbus push {} fail error log file ", logFilePath, ee);
-                                        }
-                                    }
-                                } finally {
-                                    countDownLatch.countDown();
-                                }
-                            });
-                            try {
-                                countDownLatch.await();
-                            } catch (InterruptedException e) {
-                                throw new RuntimeException(e);
-                            }
-                        } catch (Exception e) {
-                            log.error("logbus walk error {}", path, e);
-                        }
-                    },
-                    3_000,
-                    33,
-                    TimeUnit.MILLISECONDS
-            );
+        for (int i = 0; i < BootConfig.getIns().getExecutorCoreSize(); i++) {
+            final Path path = pathBase.resolve(String.valueOf(i));
+            /*本次没执行完成不执行下一个*/
+            PostRunnable postRunnable = new PostRunnable(path);
+            postRunnableMap.put(path, postRunnable);
         }
+
+        scheduledExecutorService.scheduleWithFixedDelay(
+                () -> {
+                    for (Map.Entry<Path, PostRunnable> entry : postRunnableMap.entrySet()) {
+                        PostRunnable postRunnable = entry.getValue();
+                        /*本次没执行完成不执行下一个*/
+                        if (postRunnable.running.get()) continue;
+                        String[] files = postRunnable.file.list();
+                        /*当前目录不为空*/
+                        if (files == null || files.length < 1) continue;
+                        if (postRunnable.running.compareAndSet(false, true)) {
+                            scheduledExecutorService.execute(postRunnable);
+                        }
+                    }
+                },
+                3_000,
+                33,
+                TimeUnit.MILLISECONDS
+        );
 
     }
 

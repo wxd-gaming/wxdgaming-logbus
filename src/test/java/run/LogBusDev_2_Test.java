@@ -19,16 +19,16 @@ public class LogBusDev_2_Test extends LogBusTest {
     public static void main(String[] args) {
         LogBusDev_2_Test logBusDevTest = new LogBusDev_2_Test("log-boot-dev2.yml");
         logBusDevTest.test();
-        // for (int i = 0; i < 1000; i++) {
-        //     for (int j = 0; j < 1000; j++) {
-        //         logBusDevTest.pushItem();
-        //     }
-        //     try {
-        //         Thread.sleep(1000);
-        //     } catch (InterruptedException e) {
-        //         throw new RuntimeException(e);
-        //     }
-        // }
+        for (int i = 0; i < 1; i++) {
+            for (int j = 0; j < 1000; j++) {
+                logBusDevTest.pushItem();
+            }
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
 }

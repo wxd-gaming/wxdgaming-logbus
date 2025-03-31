@@ -16,26 +16,24 @@ import java.util.List;
 public class FileUtil {
 
     /** 把内容覆盖到文件 */
-    public static void writeString2File(String pathStr, String content) {
+    public static void writeString2File(Path path, String content) {
         try {
-            Path path = Path.of(pathStr);
             Files.createDirectories(path.getParent());
             Files.writeString(path, content);
         } catch (Exception ex) {
-            throw new RuntimeException("写入文件失败：" + pathStr, ex);
+            throw new RuntimeException("写入文件失败：" + path, ex);
         }
     }
 
-    public static void writeLog2File(String pathStr, String url, List<JSONObject> content) {
-        writeString2File(pathStr, "0\n%s\n%s".formatted(url, JSON.toJSONString(content)));
+    public static void writeLog2File(Path path, String url, List<JSONObject> content) {
+        writeString2File(path, "0\n%s\n%s".formatted(url, JSON.toJSONString(content)));
     }
 
-    public static String readLog4File(String pathStr) {
+    public static String readLog4File(Path path) {
         try {
-            Path path = Path.of(pathStr);
             return Files.readString(path);
         } catch (Exception ex) {
-            throw new RuntimeException("写入文件失败：" + pathStr, ex);
+            throw new RuntimeException("写入文件失败：" + path, ex);
         }
     }
 
