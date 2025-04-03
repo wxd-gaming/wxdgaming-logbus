@@ -21,7 +21,7 @@ import java.util.function.Predicate;
 @Accessors(chain = true)
 public class LinkedTable<K1, K2, V> implements Serializable {
 
-    private static final Map EMPTY_MAP = Map.of();
+    private static final Map EMPTY_MAP = Collections.emptyMap();
 
     private final LinkedHashMap<K1, LinkedHashMap<K2, V>> nodes;
 

@@ -19,6 +19,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 /**
  * post执行器
@@ -47,7 +48,7 @@ public class PostRunnable implements Runnable {
             List<Path> list1 = Files.walk(pathData, 99)
                     .filter(Files::isRegularFile)
                     .filter(v -> System.currentTimeMillis() - v.toFile().lastModified() > 2000)
-                    .filter(v -> v.getFileName().toString().endsWith(".dat")).toList();
+                    .filter(v -> v.getFileName().toString().endsWith(".dat")).collect(Collectors.toList());
 
             if (list1.isEmpty()) return;
             CountDownLatch countDownLatch = new CountDownLatch(list1.size());
@@ -57,7 +58,7 @@ public class PostRunnable implements Runnable {
                     String url = null;
                     List<JSONObject> jsonData = null;
                     try {
-                        List<String> list = Files.lines(logFilePath, StandardCharsets.UTF_8).toList();
+                        List<String> list = Files.lines(logFilePath, StandardCharsets.UTF_8).collect(Collectors.toList());
                         postCount = Integer.parseInt(list.get(0));
                         url = list.get(1);
                         jsonData = JSON.parseArray(list.get(2), JSONObject.class);
@@ -69,7 +70,7 @@ public class PostRunnable implements Runnable {
                             ex.printStackTrace(System.err);
                         }
                     }
-                    if (url == null || url.isBlank()) {
+                    if (StringUtils.isBlank(url)) {
                         return;
                     }
                     try {
@@ -95,10 +96,10 @@ public class PostRunnable implements Runnable {
                             if (postCount > 10) {
                                 Path errorPathString = pathError.resolve(sdf.format(new Date())).resolve(System.nanoTime() + "-" + StringUtils.randomString(4) + ".dat");
                                 log.error("logbus push {} fail error log file {}", logFilePath, errorPathString, e);
-                                FileUtil.writeString2File(errorPathString, "%s\n%s".formatted(url, JSON.toJSONString(jsonData)));
+                                FileUtil.writeString2File(errorPathString, String.format("%s\n%s", url, JSON.toJSONString(jsonData)));
                                 Files.delete(logFilePath);
                             } else {
-                                FileUtil.writeString2File(logFilePath, "%s\n%s\n%s".formatted(postCount, url, JSON.toJSONString(jsonData)));
+                                FileUtil.writeString2File(logFilePath, String.format("%s\n%s\n%s", postCount, url, JSON.toJSONString(jsonData)));
                             }
                         } catch (Exception ee) {
                             log.error("logbus push {} fail error log file ", logFilePath, ee);

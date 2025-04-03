@@ -7,16 +7,15 @@ import lombok.extern.slf4j.Slf4j;
 import wxdgaming.logbus.HexId;
 import wxdgaming.logbus.LogBus;
 import wxdgaming.logbus.LogMain;
+import wxdgaming.logbus.util.FileUtil;
 import wxdgaming.logbus.util.RandomUtils;
 import wxdgaming.logbus.util.StringUtils;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -29,7 +28,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class LogBusTest {
 
-    static Path path = Path.of("src/test/resources/account.json");
+    static Path path = Paths.get("src/test/resources/account.json");
     static List<JSONObject> recordMap = new ArrayList<>();
 
     public static void main(String[] args) throws IOException {
@@ -45,19 +44,17 @@ public class LogBusTest {
             recordMap.add(record);
         }
         Files.createDirectories(path.getParent());
-        Files.writeString(path, JSON.toJSONString(recordMap, SerializerFeature.PrettyFormat));
+        FileUtil.writeString2File(path, JSON.toJSONString(recordMap, SerializerFeature.PrettyFormat));
     }
 
     public LogBusTest(String configName) {
         LogMain.launch(configName);
         LogBus.getInstance().addRoleLogType("role_copy_success", "副本通关");
         LogBus.getInstance().addServerLogType("server_rank_lv", "排行榜");
-        try {
-            String string = Files.readString(path);
-            recordMap = JSON.parseArray(string, JSONObject.class);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+
+        String string = FileUtil.readString4File(path);
+        recordMap = JSON.parseArray(string, JSONObject.class);
+
         addServer();
         pushServer();
 
@@ -214,7 +211,7 @@ public class LogBusTest {
     }
 
     public void pushRecharge(int sid, String account, long roleId) {
-        List<Integer> integers = List.of(600, 1200, 6400, 9800, 12800, 25600, 48800, 64800);
+        List<Integer> integers = Arrays.asList(600, 1200, 6400, 9800, 12800, 25600, 48800, 64800);
         for (Integer amount : integers) {
             if (RandomUtils.randomBoolean(5500)) {/*35%概率会充值*/
                 /*充值日志*/

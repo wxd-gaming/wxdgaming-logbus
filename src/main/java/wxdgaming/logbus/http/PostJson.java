@@ -48,7 +48,7 @@ public class PostJson extends HttpBase<PostJson> {
             response.cookieStore = httpClientPool.getCookieStore().getCookies();
             String header = response.getHeader(HttpHeadNameType.Content_Encoding.getValue());
             response.bodys = EntityUtils.toByteArray(classicHttpResponse.getEntity());
-            if (header != null && !header.isBlank() && header.toLowerCase().contains("gzip")) {
+            if (header != null && header.toLowerCase().contains("gzip")) {
                 response.bodys = GzipUtil.unGZip(response.bodys);
             }
             return null;

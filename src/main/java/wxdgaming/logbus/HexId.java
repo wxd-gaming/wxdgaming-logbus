@@ -43,8 +43,8 @@ public class HexId implements Serializable {
     /** 得到当前本地系统时间 周期天数 1970 年开始 */
     static int __days(long millis) {
         Instant instant = Instant.ofEpochMilli(millis);
-        LocalDate localDate = LocalDate.ofInstant(instant, ZoneId.systemDefault());
-        return (int) localDate.toEpochDay();
+        LocalDateTime localDate = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+        return (int) localDate.toLocalDate().toEpochDay();
     }
 
     /** 用秒表示今天日期 */
