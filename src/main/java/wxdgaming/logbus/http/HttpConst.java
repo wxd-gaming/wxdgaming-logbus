@@ -14,9 +14,13 @@ public interface HttpConst {
 
     ContentType APPLICATION_FORM_URLENCODED = ContentType.create("application/x-www-form-urlencoded", StandardCharsets.UTF_8);
 
+    ContentType MULTIPART_FORM_DATA = ContentType.create("multipart/form-data", StandardCharsets.UTF_8);
+
     ContentType TEXT_HTML = ContentType.create("text/html", StandardCharsets.UTF_8);
 
     ContentType TEXT_MARKDOWN = ContentType.create("text/markdown", StandardCharsets.UTF_8);
 
     ContentType TEXT_PLAIN = ContentType.create("text/plain", StandardCharsets.UTF_8);
+
+    ContentType APPLICATION_JSON = ContentType.create("application/json", StandardCharsets.UTF_8);
 }

@@ -19,7 +19,7 @@ import java.io.IOException;
 @Accessors(chain = true)
 public class PostJson extends HttpBase<PostJson> {
 
-    private ContentType contentType = ContentType.APPLICATION_JSON;
+    private ContentType contentType = HttpConst.APPLICATION_JSON;
     private String params = "";
 
     public PostJson(HttpClientPool httpClientPool, String uriPath) {
