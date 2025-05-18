@@ -7,6 +7,8 @@ import wxdgaming.logbus.http.HttpClientPool;
 import wxdgaming.logbus.http.PostJson;
 import wxdgaming.logbus.http.Response;
 import wxdgaming.logbus.util.FileUtil;
+import wxdgaming.logbus.util.JsonUtil;
+import wxdgaming.logbus.util.Md5Util;
 import wxdgaming.logbus.util.StringUtils;
 
 import java.io.File;
@@ -74,12 +76,16 @@ public class PostRunnable implements Runnable {
                         return;
                     }
                     try {
+
                         JSONObject postData = new JSONObject();
                         postData.put("gameId", BootConfig.getIns().getAppId());
-                        postData.put("token", BootConfig.getIns().getLogToken());
                         postData.put("data", jsonData);
+
+                        String sign = Md5Util.sign(postData, BootConfig.getIns().getLogToken());
+                        postData.put("token", sign);
+
                         Response<PostJson> request = new PostJson(HttpClientPool.getDefault(), BootConfig.getIns().getPortUrl() + "/" + url)
-                                .setParams(postData.toJSONString())
+                                .setParams(JsonUtil.toJSONString(postData))
                                 .readTimeout(130000)
                                 .retry(2)
                                 .request();

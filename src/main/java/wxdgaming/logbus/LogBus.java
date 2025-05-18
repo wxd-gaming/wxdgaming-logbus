@@ -9,6 +9,7 @@ import wxdgaming.logbus.http.HttpClientPool;
 import wxdgaming.logbus.http.PostJson;
 import wxdgaming.logbus.http.Response;
 import wxdgaming.logbus.util.FileUtil;
+import wxdgaming.logbus.util.Md5Util;
 import wxdgaming.logbus.util.StringUtils;
 
 import java.nio.file.Path;
@@ -107,11 +108,15 @@ public class LogBus {
     }
 
     public void addRoleLogType(String logType, String logComment) {
+
         JSONObject postData = new JSONObject();
         postData.put("gameId", BootConfig.getIns().getAppId());
-        postData.put("token", BootConfig.getIns().getAppToken());
         postData.put("logType", logType);
         postData.put("logComment", logComment);
+
+        String sign = Md5Util.sign(postData, BootConfig.getIns().getAppToken());
+        postData.put("token", sign);
+
         String uriPath = BootConfig.getIns().getPortUrl() + "/game/addRoleLogType";
         try {
             Response<PostJson> request = new PostJson(HttpClientPool.getDefault(), uriPath)
@@ -128,9 +133,12 @@ public class LogBus {
     public void addServerLogType(String logType, String logComment) {
         JSONObject postData = new JSONObject();
         postData.put("gameId", BootConfig.getIns().getAppId());
-        postData.put("token", BootConfig.getIns().getAppToken());
         postData.put("logType", logType);
         postData.put("logComment", logComment);
+
+        String sign = Md5Util.sign(postData, BootConfig.getIns().getAppToken());
+        postData.put("token", sign);
+
         String uriPath = BootConfig.getIns().getPortUrl() + "/game/addServerLogType";
         try {
             Response<PostJson> request = new PostJson(HttpClientPool.getDefault(), uriPath)

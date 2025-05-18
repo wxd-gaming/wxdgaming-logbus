@@ -88,6 +88,7 @@ public class LogBusTest {
                 );
             }
         }
+        int p = 0;
     }
 
     public void addServer() {
